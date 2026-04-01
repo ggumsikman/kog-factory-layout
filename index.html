@@ -42,8 +42,12 @@
 
   <!-- 캔버스 -->
   <div class="canvas-wrap" id="canvasWrap">
-    <div class="canvas" id="canvas" style="width:2000px;height:1100px;">
+    <div class="canvas" id="canvas" style="width:1608px;height:816px;">
       <div class="canvas-title" id="canvasTitle">가동 — 전조실</div>
+      <!-- 배경 이미지 (캐드 도면) -->
+      <img id="canvasBg" src="images/bg_ga.png"
+           style="position:absolute;top:0;left:0;width:100%;height:100%;
+                  opacity:0.4;pointer-events:none;user-select:none;z-index:0;">
     </div>
   </div>
 
@@ -52,6 +56,13 @@
     <h3>속성 패널</h3>
     <div id="propsContent">
       <div class="nosel">기계를 클릭하면<br>속성이 표시됩니다<br><br>💡 드래그로 배치<br>모서리로 크기조절</div>
+    </div>
+    <hr class="phr">
+    <div style="font-size:10px;color:#888;margin-bottom:5px;">배경 도면 설정</div>
+    <div class="pg">
+      <label>도면 투명도 <span id="bgOpacityVal">40%</span></label>
+      <input type="range" id="bgOpacity" min="0" max="100" value="40"
+             oninput="setBgOpacity(this.value)">
     </div>
     <hr class="phr">
     <div style="font-size:10px;color:#888;margin-bottom:5px;">캔버스 설정</div>

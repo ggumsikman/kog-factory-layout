@@ -5,6 +5,16 @@
  */
 
 // ═══════════════════════════════════════════
+// 배경 이미지 설정 (탭별)
+// ═══════════════════════════════════════════
+const BG = {
+  ga:  { src: 'images/bg_ga.png', w: 1608, h: 816  },
+  na:  { src: 'images/bg_na.png', w: 1132, h: 850  },
+  da:  { src: 'images/bg_da.png', w: 1582, h: 738  },
+  '2f':{ src: 'images/bg_2f.png', w: 1226, h: 631  },
+};
+
+// ═══════════════════════════════════════════
 // 상태
 // ═══════════════════════════════════════════
 let curTab    = 0;
@@ -260,18 +270,35 @@ function switchTab(idx) {
   document.getElementById('canvasTitle').textContent = TAB_NAMES[idx];
   selectedEl = null; renderPropsEmpty();
 
-  // 2층 탭은 캔버스를 넓게 (25000mm = 2500px)
-  if (TABS[idx] === '2f') {
-    document.getElementById('cvW').value = 2500;
-    document.getElementById('cvH').value = 1200;
-  } else {
-    document.getElementById('cvW').value = 2000;
-    document.getElementById('cvH').value = 1100;
-  }
+  // 캔버스 크기를 배경 이미지에 맞춤
+  const bg = BG[TABS[idx]];
+  document.getElementById('cvW').value = bg.w;
+  document.getElementById('cvH').value = bg.h;
   resizeCv();
+  applyBg();
 
   renderSidebar(); renderCanvas();
   document.getElementById('sb-tab').textContent = TAB_NAMES[idx];
+}
+
+// 배경 이미지 적용
+function applyBg() {
+  const canvas = document.getElementById('canvas');
+  const tk     = TABS[curTab];
+  const bg     = BG[tk];
+  const opacity = document.getElementById('bgOpacity')?.value ?? 40;
+  const imgEl = document.getElementById('canvasBg');
+  if (imgEl) {
+    imgEl.src     = bg.src;
+    imgEl.style.opacity = opacity / 100;
+  }
+}
+
+function setBgOpacity(val) {
+  const imgEl = document.getElementById('canvasBg');
+  if (imgEl) imgEl.style.opacity = val / 100;
+  const lbl = document.getElementById('bgOpacityVal');
+  if (lbl) lbl.textContent = val + '%';
 }
 
 // ═══════════════════════════════════════════
@@ -374,8 +401,13 @@ function addZone() {
 // ═══════════════════════════════════════════
 function resizeCv() {
   const c = document.getElementById('canvas');
-  c.style.width  = document.getElementById('cvW').value + 'px';
-  c.style.height = document.getElementById('cvH').value + 'px';
+  const w = document.getElementById('cvW').value;
+  const h = document.getElementById('cvH').value;
+  c.style.width  = w + 'px';
+  c.style.height = h + 'px';
+  // 배경 이미지도 같은 크기로
+  const imgEl = document.getElementById('canvasBg');
+  if (imgEl) { imgEl.style.width = w + 'px'; imgEl.style.height = h + 'px'; }
 }
 
 // ═══════════════════════════════════════════
@@ -431,6 +463,13 @@ document.addEventListener('keydown', e => {
 // 초기화
 // ═══════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
+  // 초기 캔버스 크기를 가동 배경 이미지에 맞춤
+  const initBg = BG[TABS[0]];
+  document.getElementById('cvW').value = initBg.w;
+  document.getElementById('cvH').value = initBg.h;
+  resizeCv();
+  applyBg();
+
   renderSidebar();
   initDrop();
   renderCanvas();
