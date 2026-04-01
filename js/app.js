@@ -12,6 +12,7 @@ let selectedUids = new Set(); // 다중 선택
 let nextId      = 1;
 let dragState   = null;
 let rbState     = null; // 고무밴드 선택 상태
+let snapEnabled = true; // 격자 스냅 ON/OFF
 
 // ═══════════════════════════════════════════
 // 사이드바 렌더링
@@ -219,8 +220,15 @@ function initDrop() {
   });
 }
 
-const snap  = v => Math.round(v/40)*40;
+const snap  = v => snapEnabled ? Math.round(v/40)*40 : Math.round(v);
 const snapS = v => Math.round(v/8)*8;
+
+function toggleSnap() {
+  snapEnabled = !snapEnabled;
+  const btn = document.getElementById('snapBtn');
+  btn.textContent = snapEnabled ? '🧲 스냅 ON' : '🧲 스냅 OFF';
+  btn.className = snapEnabled ? 'snap-on' : 'snap-off';
+}
 
 // ═══════════════════════════════════════════
 // 기계 CRUD

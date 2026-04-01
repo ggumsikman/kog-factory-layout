@@ -23,6 +23,8 @@ body { font-family: 'Malgun Gothic', sans-serif; background: #f0f2f5; overflow: 
 .hbtns button:hover { background: rgba(255,255,255,0.25); }
 .hbtns .sbtn { background: #2b6cb0; border-color: #3182ce; }
 .hbtns .gbtn { background: #276749; border-color: #38a169; }
+.hbtns .snap-on  { background: #2b6cb0; border-color: #3182ce; }
+.hbtns .snap-off { background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,0.4); }
 
 /* ── 탭 ── */
 .tabs { display: flex; background: #2c5282; padding: 0 14px; }
