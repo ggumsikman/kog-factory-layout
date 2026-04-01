@@ -5,16 +5,6 @@
  */
 
 // ═══════════════════════════════════════════
-// 배경 이미지 설정 (탭별)
-// ═══════════════════════════════════════════
-const BG = {
-  ga:  { src: 'images/bg_ga.png', w: 1608, h: 816  },
-  na:  { src: 'images/bg_na.png', w: 1132, h: 850  },
-  da:  { src: 'images/bg_da.png', w: 1582, h: 738  },
-  '2f':{ src: 'images/bg_2f.png', w: 1226, h: 631  },
-};
-
-// ═══════════════════════════════════════════
 // 상태
 // ═══════════════════════════════════════════
 let curTab    = 0;
@@ -270,35 +260,18 @@ function switchTab(idx) {
   document.getElementById('canvasTitle').textContent = TAB_NAMES[idx];
   selectedEl = null; renderPropsEmpty();
 
-  // 캔버스 크기를 배경 이미지에 맞춤
-  const bg = BG[TABS[idx]];
-  document.getElementById('cvW').value = bg.w;
-  document.getElementById('cvH').value = bg.h;
+  // 2층 탭은 캔버스를 넓게 (25000mm = 2500px)
+  if (TABS[idx] === '2f') {
+    document.getElementById('cvW').value = 2500;
+    document.getElementById('cvH').value = 1200;
+  } else {
+    document.getElementById('cvW').value = 2000;
+    document.getElementById('cvH').value = 1100;
+  }
   resizeCv();
-  applyBg();
 
   renderSidebar(); renderCanvas();
   document.getElementById('sb-tab').textContent = TAB_NAMES[idx];
-}
-
-// 배경 이미지 적용
-function applyBg() {
-  const canvas = document.getElementById('canvas');
-  const tk     = TABS[curTab];
-  const bg     = BG[tk];
-  const opacity = document.getElementById('bgOpacity')?.value ?? 40;
-  const imgEl = document.getElementById('canvasBg');
-  if (imgEl) {
-    imgEl.src     = bg.src;
-    imgEl.style.opacity = opacity / 100;
-  }
-}
-
-function setBgOpacity(val) {
-  const imgEl = document.getElementById('canvasBg');
-  if (imgEl) imgEl.style.opacity = val / 100;
-  const lbl = document.getElementById('bgOpacityVal');
-  if (lbl) lbl.textContent = val + '%';
 }
 
 // ═══════════════════════════════════════════
@@ -309,12 +282,12 @@ function saveLayout() {
     v: 2, layouts, nextId,
     cv: { w: document.getElementById('cvW').value, h: document.getElementById('cvH').value }
   };
-  localStorage.setItem('cog_v2', JSON.stringify(data));
+  localStorage.setItem('kog_v2', JSON.stringify(data));
   document.getElementById('sb-saved').textContent = '저장됨: ' + new Date().toLocaleTimeString('ko-KR');
 }
 
 function loadLayout() {
-  const raw = localStorage.getItem('cog_v2');
+  const raw = localStorage.getItem('kog_v2');
   if (!raw) { alert('저장된 데이터가 없습니다.'); return; }
   try {
     const d = JSON.parse(raw);
@@ -341,7 +314,7 @@ function exportJSON() {
   const blob = new Blob([JSON.stringify({ v:2, layouts, nextId }, null, 2)], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'cog_layout_' + new Date().toISOString().slice(0,10) + '.json';
+  a.download = 'kog_layout_' + new Date().toISOString().slice(0,10) + '.json';
   a.click();
 }
 
@@ -401,13 +374,8 @@ function addZone() {
 // ═══════════════════════════════════════════
 function resizeCv() {
   const c = document.getElementById('canvas');
-  const w = document.getElementById('cvW').value;
-  const h = document.getElementById('cvH').value;
-  c.style.width  = w + 'px';
-  c.style.height = h + 'px';
-  // 배경 이미지도 같은 크기로
-  const imgEl = document.getElementById('canvasBg');
-  if (imgEl) { imgEl.style.width = w + 'px'; imgEl.style.height = h + 'px'; }
+  c.style.width  = document.getElementById('cvW').value + 'px';
+  c.style.height = document.getElementById('cvH').value + 'px';
 }
 
 // ═══════════════════════════════════════════
@@ -463,19 +431,12 @@ document.addEventListener('keydown', e => {
 // 초기화
 // ═══════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
-  // 초기 캔버스 크기를 가동 배경 이미지에 맞춤
-  const initBg = BG[TABS[0]];
-  document.getElementById('cvW').value = initBg.w;
-  document.getElementById('cvH').value = initBg.h;
-  resizeCv();
-  applyBg();
-
   renderSidebar();
   initDrop();
   renderCanvas();
 
   // 이전 저장 데이터 자동 불러오기
-  const raw = localStorage.getItem('cog_v2');
+  const raw = localStorage.getItem('kog_v2');
   if (raw) {
     try {
       const d = JSON.parse(raw);
