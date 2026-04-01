@@ -8,7 +8,7 @@
 // 상태
 // ═══════════════════════════════════════════
 let curTab    = 0;
-let layouts   = { ga: [], na: [], da: [] };
+let layouts   = { ga: [], na: [], da: [], '2f': [] };
 let selectedEl = null;
 let nextId    = 1;
 let dragState = null;
@@ -259,6 +259,17 @@ function switchTab(idx) {
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.getElementById('canvasTitle').textContent = TAB_NAMES[idx];
   selectedEl = null; renderPropsEmpty();
+
+  // 2층 탭은 캔버스를 넓게 (25000mm = 2500px)
+  if (TABS[idx] === '2f') {
+    document.getElementById('cvW').value = 2500;
+    document.getElementById('cvH').value = 1200;
+  } else {
+    document.getElementById('cvW').value = 2000;
+    document.getElementById('cvH').value = 1100;
+  }
+  resizeCv();
+
   renderSidebar(); renderCanvas();
   document.getElementById('sb-tab').textContent = TAB_NAMES[idx];
 }
