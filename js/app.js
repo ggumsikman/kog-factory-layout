@@ -81,7 +81,12 @@ function createEl(m) {
   el.addEventListener('mousedown', e => {
     if (['del-btn','rot-btn','rsz'].some(c => e.target.classList.contains(c))) return;
     e.preventDefault();
-    selectM(m.uid, e.shiftKey);
+    if (e.shiftKey) {
+      selectM(m.uid, true);
+    } else if (!selectedUids.has(m.uid)) {
+      selectM(m.uid, false); // 선택 안 된 기계 클릭 → 단독 선택
+    }
+    // 이미 선택된 기계 클릭 → 기존 다중 선택 유지하고 드래그
     const r = el.getBoundingClientRect();
     dragState = { type:'move', uid:m.uid, ox:e.clientX - r.left, oy:e.clientY - r.top };
   });
