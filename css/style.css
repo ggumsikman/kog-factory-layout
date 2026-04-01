@@ -39,7 +39,7 @@ body { font-family: 'Malgun Gothic', sans-serif; background: #f0f2f5; overflow: 
 .tab:hover { color: #fff; }
 
 /* ── 메인 레이아웃 ── */
-.main { display: flex; height: calc(100vh - 78px); }
+.main { display: flex; height: calc(100vh - 98px); }
 
 /* ── 사이드바 ── */
 .sidebar {
