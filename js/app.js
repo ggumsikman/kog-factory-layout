@@ -1,17 +1,17 @@
 /**
  * app.js
  * 편집기 핵심 로직
- * (사이드바, 캔버스 드래그앤드롭, 선택/이동/리사이즈, 저장/불러오기)
  */
 
 // ═══════════════════════════════════════════
 // 상태
 // ═══════════════════════════════════════════
-let curTab    = 0;
-let layouts   = { ga: [], na: [], da: [], '2f': [] };
-let selectedEl = null;
-let nextId    = 1;
-let dragState = null;
+let curTab      = 0;
+let layouts     = { ga: [], na: [], da: [], '2f': [] };
+let selectedUids = new Set(); // 다중 선택
+let nextId      = 1;
+let dragState   = null;
+let rbState     = null; // 고무밴드 선택 상태
 
 // ═══════════════════════════════════════════
 // 사이드바 렌더링
@@ -70,6 +70,8 @@ function createEl(m) {
     <div class="pm-spec">${esc(m.spec||'')}</div>
     <div class="rsz"></div>`;
 
+  if (selectedUids.has(m.uid)) el.classList.add('selected');
+
   el.querySelector('.del-btn').addEventListener('click', e => { e.stopPropagation(); delM(m.uid); });
   el.querySelector('.rot-btn').addEventListener('click', e => { e.stopPropagation(); rotM(m.uid); });
   el.querySelector('.rsz').addEventListener('mousedown', e => {
@@ -79,7 +81,7 @@ function createEl(m) {
   el.addEventListener('mousedown', e => {
     if (['del-btn','rot-btn','rsz'].some(c => e.target.classList.contains(c))) return;
     e.preventDefault();
-    selectM(m.uid);
+    selectM(m.uid, e.shiftKey);
     const r = el.getBoundingClientRect();
     dragState = { type:'move', uid:m.uid, ox:e.clientX - r.left, oy:e.clientY - r.top };
   });
@@ -93,6 +95,27 @@ function createEl(m) {
 function initDrop() {
   const canvas = document.getElementById('canvas');
 
+  // 빈 캔버스 클릭/드래그: 고무밴드 선택
+  canvas.addEventListener('mousedown', e => {
+    if (e.target !== canvas && e.target.id !== 'canvasTitle') return;
+    e.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    rbState = { sx: e.clientX - r.left, sy: e.clientY - r.top };
+
+    // 고무밴드 오버레이 생성
+    let ov = document.getElementById('rbOverlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'rbOverlay';
+      ov.style.cssText = 'position:absolute;border:1.5px dashed #3182ce;background:rgba(49,130,206,0.07);pointer-events:none;z-index:50;display:none;';
+      canvas.appendChild(ov);
+    }
+    ov.style.left = rbState.sx + 'px';
+    ov.style.top  = rbState.sy + 'px';
+    ov.style.width = '0'; ov.style.height = '0';
+    ov.style.display = 'block';
+  });
+
   canvas.addEventListener('dragover', e => e.preventDefault());
   canvas.addEventListener('drop', e => {
     e.preventDefault();
@@ -103,22 +126,51 @@ function initDrop() {
                Math.max(0, snap(e.clientY - r.top  - def.h/2)));
     } catch(err) { console.error(err); }
   });
-  canvas.addEventListener('click', e => { if (e.target === canvas) clearSelected(); });
 
   document.addEventListener('mousemove', e => {
     const cr = document.getElementById('canvas').getBoundingClientRect();
     document.getElementById('sb-pos').textContent =
       `마우스: (${Math.round(e.clientX-cr.left)}, ${Math.round(e.clientY-cr.top)})`;
 
+    // 고무밴드 업데이트
+    if (rbState) {
+      const cx = e.clientX - cr.left;
+      const cy = e.clientY - cr.top;
+      const x = Math.min(cx, rbState.sx);
+      const y = Math.min(cy, rbState.sy);
+      const ov = document.getElementById('rbOverlay');
+      if (ov) {
+        ov.style.left   = x + 'px';
+        ov.style.top    = y + 'px';
+        ov.style.width  = Math.abs(cx - rbState.sx) + 'px';
+        ov.style.height = Math.abs(cy - rbState.sy) + 'px';
+      }
+      return;
+    }
+
     if (!dragState) return;
     const m = layouts[TABS[curTab]].find(x => x.uid === dragState.uid);
     if (!m) return;
 
     if (dragState.type === 'move') {
-      m.x = Math.max(0, snap(e.clientX - cr.left - dragState.ox));
-      m.y = Math.max(0, snap(e.clientY - cr.top  - dragState.oy));
-      const el = document.getElementById('pm_'+m.uid);
-      if (el) { el.style.left = m.x+'px'; el.style.top = m.y+'px'; }
+      const newX = Math.max(0, snap(e.clientX - cr.left - dragState.ox));
+      const newY = Math.max(0, snap(e.clientY - cr.top  - dragState.oy));
+      const dx = newX - m.x;
+      const dy = newY - m.y;
+      if (dx === 0 && dy === 0) return;
+
+      // 선택된 모든 기계 함께 이동
+      const tk = TABS[curTab];
+      const toMove = selectedUids.has(m.uid) ? selectedUids : new Set([m.uid]);
+      toMove.forEach(uid => {
+        const sm = layouts[tk].find(x => x.uid === uid);
+        if (!sm) return;
+        sm.x = Math.max(0, sm.x + dx);
+        sm.y = Math.max(0, sm.y + dy);
+        const el = document.getElementById('pm_' + uid);
+        if (el) { el.style.left = sm.x + 'px'; el.style.top = sm.y + 'px'; }
+      });
+
     } else if (dragState.type === 'resize') {
       m.w = Math.max(30, snapS(dragState.sw + e.clientX - dragState.sx));
       m.h = Math.max(24, snapS(dragState.sh + e.clientY - dragState.sy));
@@ -127,7 +179,39 @@ function initDrop() {
     }
   });
 
-  document.addEventListener('mouseup', () => { dragState = null; });
+  document.addEventListener('mouseup', e => {
+    // 고무밴드 선택 완료
+    if (rbState) {
+      const cr = document.getElementById('canvas').getBoundingClientRect();
+      const cx = e.clientX - cr.left;
+      const cy = e.clientY - cr.top;
+      const x  = Math.min(cx, rbState.sx);
+      const y  = Math.min(cy, rbState.sy);
+      const w  = Math.abs(cx - rbState.sx);
+      const h  = Math.abs(cy - rbState.sy);
+
+      const ov = document.getElementById('rbOverlay');
+      if (ov) ov.style.display = 'none';
+      rbState = null;
+
+      if (w < 5 && h < 5) {
+        // 클릭 수준 → 선택 해제
+        if (!e.shiftKey) clearSelected();
+      } else {
+        // 영역 안의 기계들 선택
+        if (!e.shiftKey) clearSelected();
+        const tk = TABS[curTab];
+        layouts[tk].forEach(m => {
+          if (m.x < x + w && m.x + m.w > x && m.y < y + h && m.y + m.h > y) {
+            addToSel(m.uid);
+          }
+        });
+        updatePropsForSel();
+      }
+      return;
+    }
+    dragState = null;
+  });
 }
 
 const snap  = v => Math.round(v/40)*40;
@@ -146,7 +230,7 @@ function addM(def, x, y) {
   };
   layouts[TABS[curTab]].push(m);
   createEl(m);
-  selectM(uid);
+  selectM(uid, false);
   updateSB();
 }
 
@@ -154,7 +238,8 @@ function delM(uid) {
   const tk = TABS[curTab];
   layouts[tk] = layouts[tk].filter(m => m.uid !== uid);
   document.getElementById('pm_'+uid)?.remove();
-  if (selectedEl?.id === 'pm_'+uid) { selectedEl = null; renderPropsEmpty(); }
+  selectedUids.delete(uid);
+  updatePropsForSel();
   updateSB();
 }
 
@@ -173,25 +258,66 @@ function rotM(uid) {
 // ═══════════════════════════════════════════
 // 선택 & 속성 패널
 // ═══════════════════════════════════════════
-function selectM(uid) {
-  selectedEl?.classList.remove('selected');
-  const el = document.getElementById('pm_'+uid);
-  if (!el) return;
-  el.classList.add('selected');
-  selectedEl = el;
-  const m = layouts[TABS[curTab]].find(x => x.uid === uid);
-  if (m) renderProps(m);
+function selectM(uid, add) {
+  if (!add) {
+    // 기존 선택 전부 해제
+    selectedUids.forEach(id => document.getElementById('pm_'+id)?.classList.remove('selected'));
+    selectedUids.clear();
+  }
+  // 이미 선택된 경우 Shift+클릭이면 해제
+  if (add && selectedUids.has(uid)) {
+    selectedUids.delete(uid);
+    document.getElementById('pm_'+uid)?.classList.remove('selected');
+    updatePropsForSel();
+    return;
+  }
+  selectedUids.add(uid);
+  document.getElementById('pm_'+uid)?.classList.add('selected');
+  updatePropsForSel();
+}
+
+function addToSel(uid) {
+  selectedUids.add(uid);
+  document.getElementById('pm_'+uid)?.classList.add('selected');
 }
 
 function clearSelected() {
-  selectedEl?.classList.remove('selected');
-  selectedEl = null;
+  selectedUids.forEach(id => document.getElementById('pm_'+id)?.classList.remove('selected'));
+  selectedUids.clear();
   renderPropsEmpty();
+}
+
+function updatePropsForSel() {
+  if (selectedUids.size === 0) { renderPropsEmpty(); return; }
+  if (selectedUids.size === 1) {
+    const uid = [...selectedUids][0];
+    const m = layouts[TABS[curTab]].find(x => x.uid === uid);
+    if (m) renderProps(m);
+    return;
+  }
+  // 다중 선택
+  document.getElementById('propsContent').innerHTML = `
+    <div style="text-align:center;padding:12px 0;color:#2b6cb0;font-weight:bold;">${selectedUids.size}개 선택됨</div>
+    <div class="nosel" style="margin-top:4px;">드래그로 함께 이동<br>방향키로 미세조정</div>
+    <hr class="phr">
+    <button class="pbtn danger" onclick="delSelected()">🗑 선택 항목 모두 삭제</button>`;
+}
+
+function delSelected() {
+  if (!confirm(selectedUids.size + '개를 모두 삭제할까요?')) return;
+  const tk = TABS[curTab];
+  selectedUids.forEach(uid => {
+    layouts[tk] = layouts[tk].filter(m => m.uid !== uid);
+    document.getElementById('pm_'+uid)?.remove();
+  });
+  selectedUids.clear();
+  renderPropsEmpty();
+  updateSB();
 }
 
 function renderPropsEmpty() {
   document.getElementById('propsContent').innerHTML =
-    '<div class="nosel">기계를 클릭하면<br>속성이 표시됩니다<br><br>💡 드래그로 배치<br>모서리로 크기조절</div>';
+    '<div class="nosel">기계를 클릭하면<br>속성이 표시됩니다<br><br>💡 드래그로 배치<br>Shift+클릭으로 다중선택<br>빈 곳 드래그로 영역선택</div>';
 }
 
 function renderProps(m) {
@@ -221,8 +347,8 @@ function renderProps(m) {
 }
 
 function getSelM() {
-  if (!selectedEl) return null;
-  const uid = parseInt(selectedEl.id.replace('pm_',''));
+  if (selectedUids.size !== 1) return null;
+  const uid = [...selectedUids][0];
   return layouts[TABS[curTab]].find(m => m.uid === uid);
 }
 
@@ -238,8 +364,8 @@ function setPropColor(k, v) {
   const m = getSelM(); if (!m) return;
   m[k] = v;
   const el = document.getElementById('pm_'+m.uid); if (!el) return;
-  if (k === 'color')       el.style.background   = v;
-  if (k === 'borderColor') el.style.borderColor  = v;
+  if (k === 'color')       el.style.background  = v;
+  if (k === 'borderColor') el.style.borderColor = v;
 }
 function setPropNum(k, v) {
   const m = getSelM(); if (!m) return;
@@ -258,9 +384,8 @@ function switchTab(idx) {
   curTab = idx;
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===idx));
   document.getElementById('canvasTitle').textContent = TAB_NAMES[idx];
-  selectedEl = null; renderPropsEmpty();
+  selectedUids.clear(); renderPropsEmpty();
 
-  // 2층 탭은 캔버스를 넓게 (25000mm = 2500px)
   if (TABS[idx] === '2f') {
     document.getElementById('cvW').value = 2500;
     document.getElementById('cvH').value = 1200;
@@ -269,7 +394,6 @@ function switchTab(idx) {
     document.getElementById('cvH').value = 1100;
   }
   resizeCv();
-
   renderSidebar(); renderCanvas();
   document.getElementById('sb-tab').textContent = TAB_NAMES[idx];
 }
@@ -407,23 +531,34 @@ document.addEventListener('keydown', e => {
   if (active === 'INPUT' || active === 'TEXTAREA') return;
 
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveLayout(); return; }
-  if (e.key === 'Delete' && selectedEl) {
-    delM(parseInt(selectedEl.id.replace('pm_','')));
+
+  // Delete: 선택된 모두 삭제
+  if (e.key === 'Delete' && selectedUids.size > 0) {
+    if (selectedUids.size === 1) {
+      delM([...selectedUids][0]);
+    } else {
+      delSelected();
+    }
     return;
   }
+
   if (e.key === 'Escape') { clearSelected(); return; }
 
-  // 방향키 이동 (40px 기본 / Shift+방향키 8px 미세조정)
-  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key) && selectedEl) {
+  // 방향키: 선택된 모두 이동 (40px / Shift: 8px 미세조정)
+  if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key) && selectedUids.size > 0) {
     e.preventDefault();
-    const m = getSelM(); if (!m) return;
     const step = e.shiftKey ? 8 : 40;
-    if (e.key === 'ArrowLeft')  m.x = Math.max(0, m.x - step);
-    if (e.key === 'ArrowRight') m.x += step;
-    if (e.key === 'ArrowUp')    m.y = Math.max(0, m.y - step);
-    if (e.key === 'ArrowDown')  m.y += step;
-    const el = document.getElementById('pm_'+m.uid);
-    if (el) { el.style.left = m.x+'px'; el.style.top = m.y+'px'; }
+    const tk = TABS[curTab];
+    selectedUids.forEach(uid => {
+      const m = layouts[tk].find(x => x.uid === uid);
+      if (!m) return;
+      if (e.key === 'ArrowLeft')  m.x = Math.max(0, m.x - step);
+      if (e.key === 'ArrowRight') m.x += step;
+      if (e.key === 'ArrowUp')    m.y = Math.max(0, m.y - step);
+      if (e.key === 'ArrowDown')  m.y += step;
+      const el = document.getElementById('pm_'+uid);
+      if (el) { el.style.left = m.x+'px'; el.style.top = m.y+'px'; }
+    });
   }
 });
 
@@ -435,7 +570,6 @@ window.addEventListener('DOMContentLoaded', () => {
   initDrop();
   renderCanvas();
 
-  // 이전 저장 데이터 자동 불러오기
   const raw = localStorage.getItem('kog_v2');
   if (raw) {
     try {
